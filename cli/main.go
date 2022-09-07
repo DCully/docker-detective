@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -77,6 +78,10 @@ func getFileSystemAsRootfsFromTarReader(reader *tar.Reader) FileSystemEntry {
 		}
 		if err != nil {
 			log.Fatalf("Container extraction failed: %s", err.Error())
+		}
+		if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeDir {
+			fmt.Println(header.Name)
+			continue
 		}
 		if header.Typeflag == tar.TypeReg {
 			files = append(files, &FileSystemEntry{
@@ -201,15 +206,33 @@ func getLayerData(cli *client.Client, imageId string) map[string]any {
 	return result
 }
 
-func main() {
-	cli := getDockerClient()
-	imageName := getImageNameFromCLI()
-	imageId := getImageIdFromImageName(cli, imageName)
-	layerData := getLayerData(cli, imageId)
-	imageData := getImageData(cli, imageId)
-	data := make(map[string]any)
-	data["layers"] = layerData
-	data["image"] = imageData
-	// TODO - we need to put the data into a database to get it out of memory
-	startWebServer(data)
+func marshalJsonAndPrint(o any) {
+	b, _ := json.Marshal(o)
+	s := string(b)
+	fmt.Println(s)
 }
+
+func main() {
+	CreateTables()
+	fsId := SaveFileSystem("image")
+	rootId := SaveFile(fsId, -1, "/", 0, true)
+	SaveFile(fsId, rootId, "a", 5, false)
+	bId := SaveFile(fsId, rootId, "b", 0, true)
+	SaveFile(fsId, rootId, "c", 5, false)
+	SaveFile(fsId, bId, "d", 11, false)
+	UpdateFileTotalSize(rootId, 45)
+	marshalJsonAndPrint(LoadDirectoryData(bId))
+	marshalJsonAndPrint(LoadDirectoryData(rootId))
+}
+
+//func main() {
+//	cli := getDockerClient()
+//	imageName := getImageNameFromCLI()
+//	imageId := getImageIdFromImageName(cli, imageName)
+//	layerData := getLayerData(cli, imageId)
+//	imageData := getImageData(cli, imageId)
+//	data := make(map[string]any)
+//	data["layers"] = layerData
+//	data["image"] = imageData
+//	startWebServer(data)
+//}
