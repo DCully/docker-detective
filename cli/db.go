@@ -6,9 +6,21 @@ import (
 	"log"
 )
 
-var conn, err = sql.Open("sqlite3", ":memory:")
+type DBFile struct {
+	Id           int64
+	FileSystemId int64
+	ParentFileId int64
+	FileName     string
+	TotalSize    int64
+	IsDirectory  bool
+}
 
-func runSQL(sql string) {
+type DirectoryData struct {
+	Dir   DBFile
+	Files []DBFile
+}
+
+func runSQL(conn *sql.DB, sql string) {
 	statement, err := conn.Prepare(sql)
 	defer statement.Close()
 	if err != nil {
@@ -20,12 +32,12 @@ func runSQL(sql string) {
 	}
 }
 
-func CreateTables() {
+func CreateTables(conn *sql.DB) {
 	filesystemsTable := `CREATE TABLE filesystems (
     	"id" integer not null unique primary key autoincrement,
     	"name" text
     );`
-	runSQL(filesystemsTable)
+	runSQL(conn, filesystemsTable)
 	filesTable := `CREATE TABLE files (
     	"id" integer not null unique primary key autoincrement,
 		"fileSystemId" integer not null,
@@ -36,10 +48,10 @@ func CreateTables() {
 		FOREIGN KEY(parentFileId) REFERENCES files(id),
 		FOREIGN KEY(fileSystemId) REFERENCES filesystems(id)
 	  );`
-	runSQL(filesTable)
+	runSQL(conn, filesTable)
 }
 
-func SaveFileSystem(name string) int64 {
+func SaveFileSystem(conn *sql.DB, name string) int64 {
 	s := `INSERT INTO filesystems(name) values (?)`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -57,7 +69,7 @@ func SaveFileSystem(name string) int64 {
 	return newFileSystemId
 }
 
-func SaveFile(fileSystemId int64, parentFileId int64, name string, totalSize int64, isDirectory bool) int64 {
+func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string, totalSize int64, isDirectory bool) int64 {
 	s := `INSERT INTO files(fileSystemId, parentFileId, fileName, totalSize, isDirectory) VALUES (?, ?, ?, ?, ?);`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -75,7 +87,7 @@ func SaveFile(fileSystemId int64, parentFileId int64, name string, totalSize int
 	return newFileId
 }
 
-func UpdateFileTotalSize(fileId int64, totalSize int64) {
+func UpdateFileTotalSize(conn *sql.DB, fileId int64, totalSize int64) {
 	sql := `update files set totalSize=? where id=?;`
 	s, _ := conn.Prepare(sql)
 	defer s.Close()
@@ -85,21 +97,7 @@ func UpdateFileTotalSize(fileId int64, totalSize int64) {
 	}
 }
 
-type DBFile struct {
-	Id           int64
-	FileSystemId int64
-	ParentFileId int64
-	FileName     string
-	TotalSize    int64
-	IsDirectory  bool
-}
-
-type DirectoryData struct {
-	Dir   DBFile
-	Files []DBFile
-}
-
-func LoadFile(fileId int64) DBFile {
+func LoadFile(conn *sql.DB, fileId int64) DBFile {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where id=?;`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -134,7 +132,7 @@ func LoadFile(fileId int64) DBFile {
 	return results[0]
 }
 
-func LoadDirectoryData(directoryId int64) DirectoryData {
+func LoadDirectoryData(conn *sql.DB, directoryId int64) DirectoryData {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where parentFileId=?;`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -167,7 +165,15 @@ func LoadDirectoryData(directoryId int64) DirectoryData {
 		})
 	}
 	return DirectoryData{
-		Dir:   LoadFile(directoryId),
+		Dir:   LoadFile(conn, directoryId),
 		Files: results,
 	}
+}
+
+func GetDB() *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
 }
