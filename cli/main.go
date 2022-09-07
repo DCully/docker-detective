@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -51,13 +50,8 @@ func getImageIdFromImageName(cli *client.Client, imageName string) string {
 	return imageIds[0].ID
 }
 
-func printMarshaledJSONString(o any) {
-	// TODO - need to make this stream, instead of doing it all in memory
-	j, err := json.Marshal(o)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fmt.Println(string(j))
+func startWebServer(o any) {
+	// TODO
 }
 
 func contains(children []*FileSystemEntry, childName string) (*FileSystemEntry, bool) {
@@ -211,10 +205,11 @@ func main() {
 	cli := getDockerClient()
 	imageName := getImageNameFromCLI()
 	imageId := getImageIdFromImageName(cli, imageName)
-	//layerData := getLayerData(cli, imageId)
+	layerData := getLayerData(cli, imageId)
 	imageData := getImageData(cli, imageId)
-	//data := make(map[string]any)
-	//data["layers"] = layerData
-	//data["image"] = imageData
-	printMarshaledJSONString(imageData)
+	data := make(map[string]any)
+	data["layers"] = layerData
+	data["image"] = imageData
+	// TODO - we need to put the data into a database to get it out of memory
+	startWebServer(data)
 }
