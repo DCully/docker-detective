@@ -15,19 +15,11 @@ import (
 	"strings"
 )
 
-type File struct {
-	Size int64
-	Name string
-	path string
-}
-
-type Directory struct {
-	Files       []File
-	Directories map[string]*Directory
-}
-
-func (directory *Directory) AddFile(file File) {
-	directory.Files = append(directory.Files, file)
+type FileSystemEntry struct {
+	Name     string             `json:"name"`
+	Value    int64              `json:"value,omitempty"`
+	Children []*FileSystemEntry `json:"children,omitempty"`
+	path     string
 }
 
 func getImageNameFromCLI() string {
@@ -59,20 +51,31 @@ func getImageIdFromImageName(cli *client.Client, imageName string) string {
 	return imageIds[0].ID
 }
 
-func getMarshaledJSONString(o any) string {
+func printMarshaledJSONString(o any) {
+	// TODO - need to make this stream, instead of doing it all in memory
 	j, err := json.Marshal(o)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	return string(j)
+	fmt.Println(string(j))
 }
 
-func getFileSystemAsRootfsFromTarReader(reader *tar.Reader) Directory {
+func contains(children []*FileSystemEntry, childName string) (*FileSystemEntry, bool) {
+	for _, c := range children {
+		if c.Name == childName {
+			return c, true
+		}
+	}
+	return nil, false
+}
+
+func getFileSystemAsRootfsFromTarReader(reader *tar.Reader) FileSystemEntry {
 	// This reference to top-level root node of the filesystem tree does not change.
-	root := Directory{Files: make([]File, 0), Directories: make(map[string]*Directory, 0)}
+	root := FileSystemEntry{Name: "/", Children: make([]*FileSystemEntry, 0)}
 
 	// This preorder traverses the filesystem tree depth-first.
-	files := make([]File, 0)
+	// On this pass, we just add the directories into our tree.
+	files := make([]*FileSystemEntry, 0)
 	for true {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -82,34 +85,44 @@ func getFileSystemAsRootfsFromTarReader(reader *tar.Reader) Directory {
 			log.Fatalf("Container extraction failed: %s", err.Error())
 		}
 		if header.Typeflag == tar.TypeReg {
-			files = append(files, File{path: header.Name, Name: header.FileInfo().Name(), Size: header.Size})
+			files = append(files, &FileSystemEntry{
+				Name:  header.FileInfo().Name(),
+				Value: header.Size,
+				path:  header.Name,
+			})
 		}
 		if header.Typeflag != tar.TypeDir {
+			// If it's not a file or a directory, just ignore it.
 			continue
 		}
 		dirNames := strings.Split(strings.TrimSuffix(header.Name, "/"), "/")
 		parent := &root
 		for _, dirName := range dirNames {
-			dir := Directory{Files: make([]File, 0), Directories: make(map[string]*Directory, 0)}
-			_, dirIsPresent := parent.Directories[dirName]
-			if !dirIsPresent {
-				parent.Directories[dirName] = &dir
+			dir, present := contains(parent.Children, dirName)
+			if !present {
+				dir = &FileSystemEntry{
+					Name:     dirName,
+					Children: make([]*FileSystemEntry, 0),
+				}
 			}
-			parent = parent.Directories[dirName]
+			parent.Children = append(parent.Children, dir)
+			parent = dir
 		}
 	}
+
+	// Now add the files into the tree.
 	for _, file := range files {
 		dirNames := strings.Split(file.path, "/")
 		dirForFile := &root
 		for i := 0; i < len(dirNames)-1; i++ {
-			dirForFile = dirForFile.Directories[dirNames[i]]
+			dirForFile, _ = contains(dirForFile.Children, dirNames[i])
 		}
-		dirForFile.AddFile(file)
+		dirForFile.Children = append(dirForFile.Children, file)
 	}
 	return root
 }
 
-func getImageData(cli *client.Client, imageId string) Directory {
+func getImageData(cli *client.Client, imageId string) FileSystemEntry {
 	// Create a container from the specified image
 	c, err := cli.ContainerCreate(
 		context.Background(),
@@ -168,7 +181,7 @@ func getLayerData(cli *client.Client, imageId string) map[string]any {
 	}
 	defer resp.Close()
 	reader := tar.NewReader(resp)
-	layerIdsToRootFSs := make(map[string]Directory, 0)
+	layerIdsToRootFSs := make(map[string]FileSystemEntry, 0)
 	manifest := make([]any, 0)
 	config := make(map[string]any)
 	for true {
@@ -198,11 +211,10 @@ func main() {
 	cli := getDockerClient()
 	imageName := getImageNameFromCLI()
 	imageId := getImageIdFromImageName(cli, imageName)
-	layerData := getLayerData(cli, imageId)
+	//layerData := getLayerData(cli, imageId)
 	imageData := getImageData(cli, imageId)
-	data := make(map[string]any)
-	data["layers"] = layerData
-	data["image"] = imageData
-	jsonData := getMarshaledJSONString(data)
-	fmt.Println(jsonData)
+	//data := make(map[string]any)
+	//data["layers"] = layerData
+	//data["image"] = imageData
+	printMarshaledJSONString(imageData)
 }
