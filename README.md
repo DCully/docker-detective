@@ -1,5 +1,17 @@
 # docker-detective
 
+## The DB building step is slow
+
+`ros:melodic-robot`
+   with an on-disk DB
+      takes ~3 minutes
+      takes ~1 minute without doing the unfinished file size updates at all
+      takes ~41 seconds when SaveFile is stubbed out
+   with an in-memory DB
+      takes ~43 seconds
+      takes ~41 seconds without doing the unfinished file size updates at all
+      takes ~39 seconds when SaveFile is stubbed out
+
 ## Demo that the FS->JSON Golang code works
 
 ```bash

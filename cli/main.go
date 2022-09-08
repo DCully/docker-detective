@@ -25,8 +25,7 @@ func serveWebApp(db *sql.DB) {
 func main() {
 	cli := getDockerClient()
 	im := getImageIdFromImageName(cli, getImageNameFromCLI())
-	db := GetDB("test.db")
-	//db := GetDB(":memory:")
+	db := GetDB(":memory:")
 	CreateTables(db)
 	parseDockerImageIntoDB(im, db, cli)
 	serveWebApp(db)

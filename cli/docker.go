@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"context"
 	"database/sql"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -36,10 +35,17 @@ func getImageIdFromImageName(cli *client.Client, imageName string) string {
 	return imageIds[0].ID
 }
 
+type DirTuple struct {
+	parentId int64
+	fileName string
+}
+
 func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemName string) {
 
 	fileSystemId := SaveFileSystem(db, fileSystemName)
 	rootDirectoryId := SaveFile(db, fileSystemId, -1, "/", 0, true)
+
+	setOfExistingDirs := make(map[DirTuple]int64, 0)
 
 	for true {
 		header, err := reader.Next()
@@ -64,22 +70,39 @@ func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemN
 		// Either way, slice it off so that we don't save it as a directory record.
 		dirPathSegments = dirPathSegments[:len(dirPathSegments)-1]
 
-		// Save all the directories from the file path - this works because SaveFile is idempotent.
-		parentFileId := rootDirectoryId
+		// Save all the directories from the file path - we are maintaining the
+		//in-memory set of records to prevent us from re-saving files.
+		parentDirectoryId := rootDirectoryId
 		for _, dirName := range dirPathSegments {
-			parentFileId = SaveFile(db, fileSystemId, parentFileId, dirName, 0, true)
-			stack.Push(parentFileId)
+
+			// one way or another this DirTuple is ending up in setOfExistingDirs
+			keyForDirExistenceSet := DirTuple{parentDirectoryId, dirName}
+
+			// check if it's already in there
+			_, present := setOfExistingDirs[keyForDirExistenceSet]
+
+			if !present {
+				// if it's not in there yet, we need to hit the DB to save a record of it
+				dirFileId := SaveFile(db, fileSystemId, parentDirectoryId, dirName, 0, true)
+				setOfExistingDirs[keyForDirExistenceSet] = dirFileId
+			}
+
+			// now this dir is definitely in the DB and our in-memory set
+			// pull out its ID and push it onto the stack in case we need to
+			// use the stack to bubble up a file's size to its parents
+			dirId, _ := setOfExistingDirs[keyForDirExistenceSet]
+			stack.Push(dirId)
+
+			// also update the parentDirectoryId variable so subsequent iterations,
+			// if any, correctly process directories as children of this iteration's directory
+			parentDirectoryId = dirId
 		}
 
-		// Now, if this is a file, save a record for the file itself,
-		// and bubble its file size up into all of its parent directory size sums.
 		if header.Typeflag == tar.TypeReg {
-			SaveFile(db, fileSystemId, parentFileId, header.FileInfo().Name(), header.FileInfo().Size(), false)
-			for !stack.IsEmpty() {
-				id, _ := stack.Pop()
-				fmt.Println("id ", id, " name ", header.Name)
-				IncrementFileTotalSize(db, id, header.FileInfo().Size())
-			}
+
+			// if this header is actually for a file, save a record of that file, too
+			SaveFile(db, fileSystemId, parentDirectoryId, header.FileInfo().Name(), header.FileInfo().Size(), false)
+
 		}
 	}
 }
@@ -125,5 +148,4 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 			loadFileSystemDataFromTarReader(tar.NewReader(reader), db, layerId)
 		}
 	}
-	// TODO parse/save the manifest, so we have layer ordering and names
 }

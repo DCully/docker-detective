@@ -20,6 +20,8 @@ type DirectoryData struct {
 	Files []DBFile
 }
 
+// TODO - this code is a mess, simplify it
+
 func runSQL(conn *sql.DB, sql string) {
 	statement, err := conn.Prepare(sql)
 	defer statement.Close()
@@ -71,20 +73,16 @@ func SaveFileSystem(conn *sql.DB, name string) int64 {
 }
 
 func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string, totalSize int64, isDirectory bool) int64 {
-	s := `INSERT OR IGNORE INTO files(fileSystemId, parentFileId, fileName, totalSize, isDirectory) VALUES (?, ?, ?, ?, ?);`
+	s := `INSERT INTO files(fileSystemId, parentFileId, fileName, totalSize, isDirectory) VALUES (?, ?, ?, ?, ?) returning id;`
 	statement, err := conn.Prepare(s)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	_, er := statement.Exec(fileSystemId, parentFileId, name, totalSize, isDirectory)
-	statement.Close()
+	rows, er := statement.Query(fileSystemId, parentFileId, name, totalSize, isDirectory)
+	defer statement.Close()
 	if er != nil {
 		log.Fatal(er.Error())
 	}
-	s2 := `select (id) from files where fileSystemId=? and parentFileId=? and fileName=?`
-	statement2, _ := conn.Prepare(s2)
-	rows, _ := statement2.Query(fileSystemId, parentFileId, name)
-	defer statement2.Close()
 	var result int64
 	rows.Next()
 	rows.Scan(&result)
@@ -92,15 +90,27 @@ func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string,
 	return result
 }
 
-func IncrementFileTotalSize(conn *sql.DB, fileId int64, totalSize int64) {
-	// TODO - make this actually increment things
-	sql := `update files set totalSize=? where id=?;`
-	s, _ := conn.Prepare(sql)
-	defer s.Close()
-	_, e := s.Exec(totalSize, fileId)
-	if e != nil {
-		log.Fatal(e.Error())
+func LoadLayerIds(conn *sql.DB) []string {
+	statement, err := conn.Prepare("select name from filesystems order by id asc;")
+	defer statement.Close()
+	if err != nil {
+		log.Fatal(err.Error())
 	}
+	results := make([]string, 0)
+	rows, er := statement.Query()
+	if er != nil {
+		log.Fatal(er.Error())
+	}
+	rows.Next() // skip 'image', just load the layers
+	for rows.Next() {
+		var name string
+		err = rows.Scan(&name)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		results = append(results, name)
+	}
+	return results
 }
 
 func LoadFile(conn *sql.DB, fileId int64) DBFile {
