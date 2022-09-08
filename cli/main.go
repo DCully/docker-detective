@@ -13,9 +13,23 @@ func getImageNameFromCLI() string {
 	return os.Args[1]
 }
 
-func parseDockerImageIntoDB(imageId string, db *sql.DB, cli *client.Client) {
+func loadImageData(imageId string, db *sql.DB, cli *client.Client, done chan<- bool) {
 	loadFileSystemDataFromImage(cli, db, imageId)
+	done <- true
+}
+
+func loadLayerData(imageId string, db *sql.DB, cli *client.Client, done chan<- bool) {
 	loadFileSystemDataFromLayers(cli, db, imageId)
+	done <- true
+}
+
+func parseDockerImageIntoDB(imageId string, db *sql.DB, cli *client.Client) {
+	imageDone := make(chan bool, 1)
+	go loadImageData(imageId, db, cli, imageDone)
+	layerDone := make(chan bool, 1)
+	go loadLayerData(imageId, db, cli, layerDone)
+	<-imageDone
+	<-layerDone
 }
 
 func serveWebApp(db *sql.DB) {

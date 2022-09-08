@@ -11,6 +11,12 @@
       takes ~43 seconds
       takes ~41 seconds without doing the unfinished file size updates at all
       takes ~39 seconds when SaveFile is stubbed out
+   with no reader interactions whatsoever, 22 seconds
+
+it takes 20 seconds to docker save ros:melodic-robot, very similar to our reader interaction time
+compilation takes ~ 2 seconds
+parallelizing things makes the whole in-memory DB building take ~17 seconds
+
 
 ## Demo that the FS->JSON Golang code works
 

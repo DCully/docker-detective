@@ -143,6 +143,8 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 		if err == io.EOF {
 			break
 		}
+		// TODO - Get a handle for a seekable tape archive,
+		// 	so we can spin out a goroutine for each layer.
 		if strings.HasSuffix(header.Name, ".tar") {
 			layerId := strings.Split(header.Name, "/")[0]
 			loadFileSystemDataFromTarReader(tar.NewReader(reader), db, layerId)
