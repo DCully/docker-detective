@@ -45,6 +45,7 @@ func CreateTables(conn *sql.DB) {
 		"fileName" text not null,
 		"totalSize" integer not null,
 		"isDirectory" integer not null,
+		UNIQUE (fileSystemId, parentFileId, fileName),
 		FOREIGN KEY(parentFileId) REFERENCES files(id),
 		FOREIGN KEY(fileSystemId) REFERENCES filesystems(id)
 	  );`
@@ -70,24 +71,29 @@ func SaveFileSystem(conn *sql.DB, name string) int64 {
 }
 
 func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string, totalSize int64, isDirectory bool) int64 {
-	s := `INSERT INTO files(fileSystemId, parentFileId, fileName, totalSize, isDirectory) VALUES (?, ?, ?, ?, ?);`
+	s := `INSERT OR IGNORE INTO files(fileSystemId, parentFileId, fileName, totalSize, isDirectory) VALUES (?, ?, ?, ?, ?);`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	rs, er := statement.Exec(fileSystemId, parentFileId, name, totalSize, isDirectory)
+	_, er := statement.Exec(fileSystemId, parentFileId, name, totalSize, isDirectory)
+	statement.Close()
 	if er != nil {
 		log.Fatal(er.Error())
 	}
-	newFileId, e := rs.LastInsertId()
-	if e != nil {
-		log.Fatal(e.Error())
-	}
-	return newFileId
+	s2 := `select (id) from files where fileSystemId=? and parentFileId=? and fileName=?`
+	statement2, _ := conn.Prepare(s2)
+	rows, _ := statement2.Query(fileSystemId, parentFileId, name)
+	defer statement2.Close()
+	var result int64
+	rows.Next()
+	rows.Scan(&result)
+	rows.Close()
+	return result
 }
 
-func UpdateFileTotalSize(conn *sql.DB, fileId int64, totalSize int64) {
+func IncrementFileTotalSize(conn *sql.DB, fileId int64, totalSize int64) {
+	// TODO - make this actually increment things
 	sql := `update files set totalSize=? where id=?;`
 	s, _ := conn.Prepare(sql)
 	defer s.Close()
@@ -170,8 +176,8 @@ func LoadDirectoryData(conn *sql.DB, directoryId int64) DirectoryData {
 	}
 }
 
-func GetDB() *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func GetDB(dataSourceName string) *sql.DB {
+	db, err := sql.Open("sqlite3", dataSourceName)
 	if err != nil {
 		log.Fatal(err)
 	}

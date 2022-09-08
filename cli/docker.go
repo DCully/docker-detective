@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -36,9 +37,10 @@ func getImageIdFromImageName(cli *client.Client, imageName string) string {
 }
 
 func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemName string) {
+
 	fileSystemId := SaveFileSystem(db, fileSystemName)
-	rootDirectoryFileId := SaveFile(db, fileSystemId, -1, "/", 0, true)
-	parentId := rootDirectoryFileId
+	rootDirectoryId := SaveFile(db, fileSystemId, -1, "/", 0, true)
+
 	for true {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -47,15 +49,39 @@ func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemN
 		if err != nil {
 			log.Fatalf("Container extraction failed: %s", err.Error())
 		}
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
+			continue
+		}
+
+		stack := DirectoryIdStack{}
+		stack.Push(rootDirectoryId)
+
+		// First, make sure all directories in this file path are saved.
+		dirPathSegments := strings.Split(header.Name, "/")
+
+		// If this is a file, the last element is the file name.
+		// If this is a directory, the last element is a blank string.
+		// Either way, slice it off so that we don't save it as a directory record.
+		dirPathSegments = dirPathSegments[:len(dirPathSegments)-1]
+
+		// Save all the directories from the file path - this works because SaveFile is idempotent.
+		parentFileId := rootDirectoryId
+		for _, dirName := range dirPathSegments {
+			parentFileId = SaveFile(db, fileSystemId, parentFileId, dirName, 0, true)
+			stack.Push(parentFileId)
+		}
+
+		// Now, if this is a file, save a record for the file itself,
+		// and bubble its file size up into all of its parent directory size sums.
 		if header.Typeflag == tar.TypeReg {
-			SaveFile(db, fileSystemId, parentId, header.FileInfo().Name(), header.Size, false)
+			SaveFile(db, fileSystemId, parentFileId, header.FileInfo().Name(), header.FileInfo().Size(), false)
+			for !stack.IsEmpty() {
+				id, _ := stack.Pop()
+				fmt.Println("id ", id, " name ", header.Name)
+				IncrementFileTotalSize(db, id, header.FileInfo().Size())
+			}
 		}
-		if header.Typeflag == tar.TypeDir {
-			SaveFile(db, fileSystemId, parentId, header.FileInfo().Name(), 0, true)
-		}
-		// TODO - update parent reference
 	}
-	// TODO - update size records on directory entries
 }
 
 func loadFileSystemDataFromImage(cli *client.Client, db *sql.DB, imageId string) {
