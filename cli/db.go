@@ -6,23 +6,29 @@ import (
 	"log"
 )
 
-type DBFile struct {
-	Id           int64
-	FileSystemId int64
-	ParentFileId int64
-	FileName     string
-	TotalSize    int64
-	IsDirectory  bool
+type FileSystemEntry struct {
+	Id    int64
+	Name  string
+	Size  int64
+	IsDir bool
+	Files []FileSystemEntry
 }
 
-type DirectoryData struct {
-	Dir   DBFile
-	Files []DBFile
+type Layer struct {
+	Id              int64
+	RootDirectoryId int64
+	Name            string
 }
 
-// TODO - this code is a mess, simplify it
+func GetDB(dataSourceName string) *sql.DB {
+	db, err := sql.Open("sqlite3", dataSourceName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
+}
 
-func runSQL(conn *sql.DB, sql string) {
+func _runCreate(conn *sql.DB, sql string) {
 	statement, err := conn.Prepare(sql)
 	defer statement.Close()
 	if err != nil {
@@ -39,7 +45,7 @@ func CreateTables(conn *sql.DB) {
     	"id" integer not null unique primary key autoincrement,
     	"name" text
     );`
-	runSQL(conn, filesystemsTable)
+	_runCreate(conn, filesystemsTable)
 	filesTable := `CREATE TABLE files (
     	"id" integer not null unique primary key autoincrement,
 		"fileSystemId" integer not null,
@@ -51,7 +57,7 @@ func CreateTables(conn *sql.DB) {
 		FOREIGN KEY(parentFileId) REFERENCES files(id),
 		FOREIGN KEY(fileSystemId) REFERENCES filesystems(id)
 	  );`
-	runSQL(conn, filesTable)
+	_runCreate(conn, filesTable)
 }
 
 func SaveFileSystem(conn *sql.DB, name string) int64 {
@@ -90,30 +96,7 @@ func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string,
 	return result
 }
 
-func LoadLayerIds(conn *sql.DB) []string {
-	statement, err := conn.Prepare("select name from filesystems order by id asc;")
-	defer statement.Close()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	results := make([]string, 0)
-	rows, er := statement.Query()
-	if er != nil {
-		log.Fatal(er.Error())
-	}
-	rows.Next() // skip 'image', just load the layers
-	for rows.Next() {
-		var name string
-		err = rows.Scan(&name)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		results = append(results, name)
-	}
-	return results
-}
-
-func LoadFile(conn *sql.DB, fileId int64) DBFile {
+func _loadFile(conn *sql.DB, fileId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where id=?;`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -124,7 +107,7 @@ func LoadFile(conn *sql.DB, fileId int64) DBFile {
 	if e != nil {
 		log.Fatal(e.Error())
 	}
-	results := make([]DBFile, 1)
+	results := make([]FileSystemEntry, 1)
 	for rows.Next() {
 		var id, fileSystemId, parentFileId, totalSize, isDirectory int64
 		var fileName string
@@ -136,19 +119,18 @@ func LoadFile(conn *sql.DB, fileId int64) DBFile {
 		if isDirectory > 0 {
 			isDir = true
 		}
-		results[0] = DBFile{
+		results[0] = FileSystemEntry{
 			id,
-			fileSystemId,
-			parentFileId,
 			fileName,
 			totalSize,
 			isDir,
+			nil,
 		}
 	}
 	return results[0]
 }
 
-func LoadDirectoryData(conn *sql.DB, directoryId int64) DirectoryData {
+func LoadDirectory(conn *sql.DB, directoryId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where parentFileId=?;`
 	statement, err := conn.Prepare(s)
 	defer statement.Close()
@@ -159,7 +141,7 @@ func LoadDirectoryData(conn *sql.DB, directoryId int64) DirectoryData {
 	if e != nil {
 		log.Fatal(e.Error())
 	}
-	results := make([]DBFile, 0)
+	results := make([]FileSystemEntry, 0)
 	for rows.Next() {
 		var id, fileSystemId, parentFileId, totalSize, isDirectory int64
 		var fileName string
@@ -171,25 +153,48 @@ func LoadDirectoryData(conn *sql.DB, directoryId int64) DirectoryData {
 		if isDirectory > 0 {
 			isDir = true
 		}
-		results = append(results, DBFile{
+		results = append(results, FileSystemEntry{
 			id,
-			fileSystemId,
-			parentFileId,
 			fileName,
 			totalSize,
 			isDir,
+			nil,
 		})
 	}
-	return DirectoryData{
-		Dir:   LoadFile(conn, directoryId),
-		Files: results,
-	}
+	d := _loadFile(conn, directoryId)
+	d.Files = results
+	return d
 }
 
-func GetDB(dataSourceName string) *sql.DB {
-	db, err := sql.Open("sqlite3", dataSourceName)
+func LoadLayers(conn *sql.DB) []Layer {
+	s := `select 
+		filesystems.id as fileSystemId,
+		files.id as rootDirectoryId,
+		filesystems.name as fileSystemName
+	from filesystems
+		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1;`
+	st, err := conn.Prepare(s)
+	defer st.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
-	return db
+	rows, error := st.Query()
+	if error != nil {
+		log.Fatal(error.Error())
+	}
+	results := make([]Layer, 0)
+	for rows.Next() {
+		var fileSystemId, fileId int64
+		var fileSystemName string
+		err = rows.Scan(&fileSystemId, &fileId, &fileSystemName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		results = append(results, Layer{
+			fileSystemId,
+			fileId,
+			fileSystemName,
+		})
+	}
+	return results
 }

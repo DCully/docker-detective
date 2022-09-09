@@ -32,15 +32,12 @@ func parseDockerImageIntoDB(imageId string, db *sql.DB, cli *client.Client) {
 	<-layerDone
 }
 
-func serveWebApp(db *sql.DB) {
-	// TODO - API + static React app
-}
-
 func main() {
-	cli := getDockerClient()
-	im := getImageIdFromImageName(cli, getImageNameFromCLI())
-	db := GetDB(":memory:")
-	CreateTables(db)
-	parseDockerImageIntoDB(im, db, cli)
-	serveWebApp(db)
+	//cli := getDockerClient()
+	//imageName := getImageNameFromCLI()
+	//im := getImageIdFromImageName(cli, imageName)
+	db := GetDB("alpine.db")
+	//CreateTables(db)
+	//parseDockerImageIntoDB(im, db, cli)
+	serveWebApp("alpine:latest", db)
 }

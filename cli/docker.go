@@ -103,6 +103,8 @@ func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemN
 			// if this header is actually for a file, save a record of that file, too
 			SaveFile(db, fileSystemId, parentDirectoryId, header.FileInfo().Name(), header.FileInfo().Size(), false)
 
+			// TODO - figure out a way to add in the aggregate file size functionality without tanking performance
+
 		}
 	}
 }
@@ -143,8 +145,6 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 		if err == io.EOF {
 			break
 		}
-		// TODO - Get a handle for a seekable tape archive,
-		// 	so we can spin out a goroutine for each layer.
 		if strings.HasSuffix(header.Name, ".tar") {
 			layerId := strings.Split(header.Name, "/")[0]
 			loadFileSystemDataFromTarReader(tar.NewReader(reader), db, layerId)
