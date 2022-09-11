@@ -11,11 +11,12 @@ func (s *DirectoryIdStack) Push(i int64) {
 }
 
 func (s *DirectoryIdStack) Pop() (int64, bool) {
-	if s.IsEmpty() {
-		return -2, false
+	isEmpty := s.IsEmpty()
+	if isEmpty {
+		return -2, isEmpty
 	}
 	i := len(*s) - 1
 	top := (*s)[i]
 	*s = (*s)[:i]
-	return top, true
+	return top, isEmpty
 }

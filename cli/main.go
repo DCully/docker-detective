@@ -33,11 +33,11 @@ func parseDockerImageIntoDB(imageId string, db *sql.DB, cli *client.Client) {
 }
 
 func main() {
-	//cli := getDockerClient()
-	//imageName := getImageNameFromCLI()
-	//im := getImageIdFromImageName(cli, imageName)
-	db := GetDB("alpine.db")
-	//CreateTables(db)
-	//parseDockerImageIntoDB(im, db, cli)
-	serveWebApp("alpine:latest", db)
+	cli := getDockerClient()
+	imageName := getImageNameFromCLI()
+	im := getImageIdFromImageName(cli, imageName)
+	db := GetDB(":memory:")
+	CreateTables(db)
+	parseDockerImageIntoDB(im, db, cli)
+	//serveWebApp("alpine:latest", db)
 }

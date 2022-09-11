@@ -103,8 +103,11 @@ func loadFileSystemDataFromTarReader(reader *tar.Reader, db *sql.DB, fileSystemN
 			// if this header is actually for a file, save a record of that file, too
 			SaveFile(db, fileSystemId, parentDirectoryId, header.FileInfo().Name(), header.FileInfo().Size(), false)
 
-			// TODO - figure out a way to add in the aggregate file size functionality without tanking performance
-
+			// Update all of this file's parent directories' total sizes with this file's size
+			dirId, stackIsEmpty := stack.Pop()
+			for ; !stackIsEmpty; dirId, stackIsEmpty = stack.Pop() {
+				IncrementFileSize(db, dirId, header.FileInfo().Size())
+			}
 		}
 	}
 }

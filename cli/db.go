@@ -25,6 +25,7 @@ func GetDB(dataSourceName string) *sql.DB {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db.SetMaxOpenConns(1)
 	return db
 }
 
@@ -104,6 +105,7 @@ func _loadFile(conn *sql.DB, fileId int64) FileSystemEntry {
 		log.Fatal(err.Error())
 	}
 	rows, e := statement.Query(fileId)
+	defer rows.Close()
 	if e != nil {
 		log.Fatal(e.Error())
 	}
@@ -128,6 +130,19 @@ func _loadFile(conn *sql.DB, fileId int64) FileSystemEntry {
 		}
 	}
 	return results[0]
+}
+
+func IncrementFileSize(conn *sql.DB, fileId int64, additionalSize int64) {
+	s := `UPDATE files SET totalSize = totalSize + ? WHERE id = ?`
+	statement, err := conn.Prepare(s)
+	defer statement.Close()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	_, er := statement.Exec(additionalSize, fileId)
+	if er != nil {
+		log.Fatal(er.Error())
+	}
 }
 
 func LoadDirectory(conn *sql.DB, directoryId int64) FileSystemEntry {
