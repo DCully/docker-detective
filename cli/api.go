@@ -16,7 +16,7 @@ func serveWebApp(imageName string, db *sql.DB) {
 	http.HandleFunc("/name", func(w http.ResponseWriter, r *http.Request) {
 		o := make(map[string]string)
 		o["imageName"] = imageName
-		j, _ := json.Marshal(LoadLayers(db))
+		j, _ := json.Marshal(o)
 		w.WriteHeader(200)
 		fmt.Fprintf(w, string(j))
 	})
