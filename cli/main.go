@@ -39,5 +39,5 @@ func main() {
 	db := GetDB(":memory:")
 	CreateTables(db)
 	parseDockerImageIntoDB(im, db, cli)
-	//serveWebApp("alpine:latest", db)
+	serveWebApp(imageName, db)
 }

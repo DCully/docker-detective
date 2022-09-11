@@ -18,6 +18,7 @@ type Layer struct {
 	Id              int64
 	RootDirectoryId int64
 	Name            string
+	Command         string
 }
 
 func GetDB(dataSourceName string) *sql.DB {
@@ -44,7 +45,8 @@ func _runCreate(conn *sql.DB, sql string) {
 func CreateTables(conn *sql.DB) {
 	filesystemsTable := `CREATE TABLE filesystems (
     	"id" integer not null unique primary key autoincrement,
-    	"name" text
+    	"name" text,
+    	"command" text default ''
     );`
 	_runCreate(conn, filesystemsTable)
 	filesTable := `CREATE TABLE files (
@@ -145,6 +147,19 @@ func IncrementFileSize(conn *sql.DB, fileId int64, additionalSize int64) {
 	}
 }
 
+func SetFileSystemCommand(conn *sql.DB, layerId int64, command string) {
+	s := `UPDATE filesystems SET command = ? WHERE id = ?`
+	statement, err := conn.Prepare(s)
+	defer statement.Close()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	_, er := statement.Exec(command, layerId)
+	if er != nil {
+		log.Fatal(er.Error())
+	}
+}
+
 func LoadDirectory(conn *sql.DB, directoryId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where parentFileId=?;`
 	statement, err := conn.Prepare(s)
@@ -185,9 +200,10 @@ func LoadLayers(conn *sql.DB) []Layer {
 	s := `select 
 		filesystems.id as fileSystemId,
 		files.id as rootDirectoryId,
-		filesystems.name as fileSystemName
+		filesystems.name as fileSystemName,
+		filesystems.command as fileSystemCommand
 	from filesystems
-		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1;`
+		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.Id asc;`
 	st, err := conn.Prepare(s)
 	defer st.Close()
 	if err != nil {
@@ -200,8 +216,8 @@ func LoadLayers(conn *sql.DB) []Layer {
 	results := make([]Layer, 0)
 	for rows.Next() {
 		var fileSystemId, fileId int64
-		var fileSystemName string
-		err = rows.Scan(&fileSystemId, &fileId, &fileSystemName)
+		var fileSystemName, fileSystemCommand string
+		err = rows.Scan(&fileSystemId, &fileId, &fileSystemName, &fileSystemCommand)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -209,6 +225,7 @@ func LoadLayers(conn *sql.DB) []Layer {
 			fileSystemId,
 			fileId,
 			fileSystemName,
+			fileSystemCommand,
 		})
 	}
 	return results

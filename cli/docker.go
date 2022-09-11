@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -136,6 +137,16 @@ func loadFileSystemDataFromImage(cli *client.Client, db *sql.DB, imageId string)
 	loadFileSystemDataFromTarReader(reader, db, "image")
 }
 
+type HistoryEntry struct {
+	Created     string
+	Created_by  string
+	empty_layer bool
+}
+
+type Config struct {
+	History []HistoryEntry
+}
+
 func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string) {
 	resp, err := cli.ImageSave(context.Background(), []string{imageId})
 	if err != nil {
@@ -143,6 +154,7 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 	}
 	defer resp.Close()
 	reader := tar.NewReader(resp)
+	var imageConfig Config
 	for true {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -151,6 +163,28 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 		if strings.HasSuffix(header.Name, ".tar") {
 			layerId := strings.Split(header.Name, "/")[0]
 			loadFileSystemDataFromTarReader(tar.NewReader(reader), db, layerId)
+		} else if header.Name != "manifest.json" && strings.HasSuffix(header.Name, ".json") {
+			_bytes := make([]byte, header.Size)
+			_, err := reader.Read(_bytes)
+			if err != io.EOF {
+				log.Fatalln(err.Error())
+			}
+			e := json.Unmarshal(_bytes, &imageConfig)
+			if e != nil {
+				return
+			}
+			history := make([]HistoryEntry, 0)
+			for _, h := range imageConfig.History {
+				if !h.empty_layer {
+					history = append(history, h)
+				}
+			}
+			imageConfig.History = history
 		}
+	}
+	layers := LoadLayers(db)
+	for i, layer := range layers {
+		history := imageConfig.History[i]
+		SetFileSystemCommand(db, layer.Id, history.Created_by)
 	}
 }
