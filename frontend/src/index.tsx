@@ -11,6 +11,7 @@ import { Chart, getElementAtEvent } from 'react-chartjs-2'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 import { getDirData, getFileSystems, getName } from './API'
+import "./index.css"
 
 ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
 ChartJS.overrides['pie'].plugins.legend.display = false
@@ -38,8 +39,14 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
     const [dirStack, setDirStack] = useState<DirData[]>([])
     const pieChartRef = useRef<ChartJS>()
 
-    const FILE_COLOR = "rgba(141, 210, 248, 0.8)"
-    const DIRE_COLOR = "rgba(39, 17, 190, 0.28)"
+    const COLORS = [
+        "rgba(141, 210, 248, 0.8)",
+        "rgba(250, 148, 201, 0.8)",
+        "rgba(39, 17, 190, 0.28)",
+        "rgba(239, 244, 155, 0.8)",
+        "rgba(119, 255, 132, 0.5)",
+        "rgba(255, 141, 141, 0.8)"
+    ]
 
     const copyDirStack = (): DirData[] => {
         return [...dirStack];
@@ -132,27 +139,34 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
         )
     }
 
+    const curDir: DirData|undefined = dirStack.at(-1)
+    let files: DirData[] = []
+    if (curDir !== undefined) {
+        files = [...curDir.Files]
+        files.sort(function(a, b){
+            return b.Size - a.Size
+        })
+    }
+
     const labels: string[] = []
     const percents: number[] = []
     const backgroundColors: string[] = []
-    const curDir: DirData|undefined = dirStack.at(-1)
-    if (curDir !== undefined) {
-        for (let file of curDir.Files) {
-            const label = file.Name
-            const size = file.Size
-            labels.push(label)
-            percents.push(size)
-            backgroundColors.push(file.IsDir ? DIRE_COLOR : FILE_COLOR)
-        }
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const label = file.Name
+        const size = file.Size
+        labels.push(label)
+        percents.push(size)
+        backgroundColors.push(COLORS[i % COLORS.length])
     }
     const pieChartData = {
         labels: labels,
         datasets: [
             {
-                label: 'MB disk usage',
+                label: 'Disk usage',
                 data: percents,
                 backgroundColor: backgroundColors,
-                borderColor: "dark-blue",
+                borderColor: "gray",
                 borderWidth: 1
             },
         ],
@@ -166,27 +180,28 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
     }
 
     let listGroupItems = []
-    if (curDir !== undefined) {
-        let files = [...curDir.Files]
-        files.sort(function(a, b){
-            return b.Size - a.Size
-        })
-        for (let file of files) {
-            if (file.IsDir) {
-                listGroupItems.push(
-                    <ListGroupItem key={file.Id} action onClick={() => handleListGroupItemClick(file)}>
-                        {rawBytesToReadableBytes(file.Size) + " - " + file.Name + "/"}
-                    </ListGroupItem>
-                )
-            } else {
-                listGroupItems.push(
-                    <ListGroupItem key={file.Id} disabled>
-                        {rawBytesToReadableBytes(file.Size) + " - " + file.Name}
-                    </ListGroupItem>
-                )
-            }
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file.IsDir && file.Size > 0) {
+            listGroupItems.push(
+                <ListGroupItem style={{backgroundColor: COLORS[i % COLORS.length]}}
+                               key={file.Id}
+                               action onClick={() => handleListGroupItemClick(file)}>
+                    {rawBytesToReadableBytes(file.Size) + " - " + file.Name + "/"}
+                </ListGroupItem>
+            )
+        } else {
+            listGroupItems.push(
+                <ListGroupItem style={{backgroundColor: COLORS[i % COLORS.length]}}
+                               key={file.Id} disabled>
+                    {rawBytesToReadableBytes(file.Size) + " - " + file.Name + (file.IsDir ? "/" : "")}
+                </ListGroupItem>
+            )
         }
     }
+
+    console.log(pieChartData)
+    console.log(listGroupItems)
 
     return (
         <div>
