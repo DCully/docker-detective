@@ -200,7 +200,7 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
             <Container>
                 <Row>
                     <Col>
-                        <ListGroup style={{fontSize: 10}}>
+                        <ListGroup style={{overflowY: 'scroll', maxHeight: window.innerHeight * 0.8}}>
                             {listGroupItems}
                         </ListGroup>
                     </Col>
