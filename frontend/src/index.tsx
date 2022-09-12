@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import Breadcrumb from 'react-bootstrap/Breadcrumb'
 import ListGroup from 'react-bootstrap/ListGroup'
-import {BreadcrumbItem, ListGroupItem} from "react-bootstrap"
+import {BreadcrumbItem, Col, ListGroupItem, Row, Container, Stack} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -13,7 +13,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels'
 import { getDirData, getFileSystems, getName } from './API'
 
 ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
-ChartJS.overrides['pie'].plugins.legend.position = 'bottom'
+ChartJS.overrides['pie'].plugins.legend.display = false
 
 type LayerDatum = {
     rootDirId: number
@@ -65,6 +65,10 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
             return
         }
         newDirStack.pop()
+        if (newDirStack.length === 1) {
+            // @ts-ignore
+            newDirStack.at(0).Name = "/"
+        }
         setDirStack(newDirStack)
     }
 
@@ -186,19 +190,25 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
 
     return (
         <div>
-            <div onClick={async () => handleBreadcrumbClick()}>
-                <Breadcrumb>
-                    {breadcrumbItems}
-                </Breadcrumb>
-            </div>
-            <div>
-                <ListGroup>
-                    {listGroupItems}
-                </ListGroup>
-            </div>
-            <div>
-                <Chart ref={pieChartRef} type='pie' data={pieChartData} onClick={handleSliceClick} options={options}/>
-            </div>
+            <Container>
+                <div onClick={async () => handleBreadcrumbClick()}>
+                    <Breadcrumb>
+                        {breadcrumbItems}
+                    </Breadcrumb>
+                </div>
+            </Container>
+            <Container>
+                <Row>
+                    <Col>
+                        <ListGroup style={{fontSize: 10}}>
+                            {listGroupItems}
+                        </ListGroup>
+                    </Col>
+                    <Col>
+                        <Chart ref={pieChartRef} type='pie' data={pieChartData} onClick={handleSliceClick} options={options}/>
+                    </Col>
+                </Row>
+            </Container>
         </div>
     )
 }
@@ -237,10 +247,12 @@ const App: React.FC = () => {
         fetchFileSystems().catch(console.error)
     }, [])
 
-    return <div>
-        <h1>{imageName}</h1>
+    return <Stack gap={3}>
+        <div className="bg-light border">
+            <h1>{imageName}</h1>
+        </div>
         <FileSystem rootDirId={imageRootId}></FileSystem>
-    </div>
+    </Stack>
 }
 
 const container = document.getElementById('app')
