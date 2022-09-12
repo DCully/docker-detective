@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import Breadcrumb from 'react-bootstrap/Breadcrumb'
 import ListGroup from 'react-bootstrap/ListGroup'
-import {BreadcrumbItem} from "react-bootstrap"
+import {BreadcrumbItem, ListGroupItem} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -89,6 +89,29 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
         await getDirDataAndPushToDirStack(fileClicked.Id).catch(console.error)
     }
 
+    const handleListGroupItemClick = async (clickedDirData: DirData) => {
+        await getDirDataAndPushToDirStack(clickedDirData.Id)
+    }
+
+    const rawBytesToReadableBytes = (val: number) => {
+        if (val < 1) {
+            return '0 B'
+        }
+        if (val > 1024*1024*1024) {
+            val = Math.round(val / 1024 / 1024 / 1024)
+            return val + ' GB'
+        }
+        if (val > 1024*1024) {
+            val = Math.round(val / 1024 / 1024)
+            return val + ' MB'
+        }
+        if (val > 1024) {
+            val = Math.round(val / 1024)
+            return val + ' KB'
+        }
+        return val + ' B'
+    }
+
     useEffect(() => {
         if (props.rootDirId < 0) {
             return
@@ -133,24 +156,30 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
     const options = {
         plugins: {
             datalabels: {
-                formatter: (val: number) => {
-                    if (val < 1) {
-                        return ''
-                    }
-                    if (val > 1024*1024*1024) {
-                        val = Math.round(val / 1024 / 1024 / 1024)
-                        return val + ' GB'
-                    }
-                    if (val > 1024*1024) {
-                        val = Math.round(val / 1024 / 1024)
-                        return val + ' MB'
-                    }
-                    if (val > 1024) {
-                        val = Math.round(val / 1024)
-                        return val + ' KB'
-                    }
-                    return val + ' B'
-                },
+                formatter: rawBytesToReadableBytes,
+            }
+        }
+    }
+
+    let listGroupItems = []
+    if (curDir !== undefined) {
+        let files = [...curDir.Files]
+        files.sort(function(a, b){
+            return b.Size - a.Size
+        })
+        for (let file of files) {
+            if (file.IsDir) {
+                listGroupItems.push(
+                    <ListGroupItem key={file.Id} action onClick={() => handleListGroupItemClick(file)}>
+                        {rawBytesToReadableBytes(file.Size) + " - " + file.Name + "/"}
+                    </ListGroupItem>
+                )
+            } else {
+                listGroupItems.push(
+                    <ListGroupItem key={file.Id} disabled>
+                        {rawBytesToReadableBytes(file.Size) + " - " + file.Name}
+                    </ListGroupItem>
+                )
             }
         }
     }
@@ -164,7 +193,7 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
             </div>
             <div>
                 <ListGroup>
-
+                    {listGroupItems}
                 </ListGroup>
             </div>
             <div>
