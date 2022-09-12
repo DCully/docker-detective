@@ -2,10 +2,9 @@ import React, {MouseEvent, useEffect, useState, useRef} from 'react'
 import { createRoot } from 'react-dom/client'
 
 import Breadcrumb from 'react-bootstrap/Breadcrumb'
+import ListGroup from 'react-bootstrap/ListGroup'
 import {BreadcrumbItem} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
-
-import FileTree from 'react-file-treeview'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Chart, getElementAtEvent } from 'react-chartjs-2'
@@ -49,10 +48,14 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
     const getDirDataAndPushToDirStack = async (dirId: number) => {
         let dirData: DirData = await getDirData(dirId)
         let newDirStack = copyDirStack()
-        if (dirData.Name === "/") {
-            dirData.Name = " "
-        }
         newDirStack.push(dirData)
+        if (newDirStack.length === 1) {
+            // @ts-ignore
+            newDirStack.at(0).Name = "/"
+        } else {
+            // @ts-ignore
+            newDirStack.at(0).Name = " "
+        }
         setDirStack(newDirStack)
     }
 
@@ -160,7 +163,9 @@ const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
                 </Breadcrumb>
             </div>
             <div>
+                <ListGroup>
 
+                </ListGroup>
             </div>
             <div>
                 <Chart ref={pieChartRef} type='pie' data={pieChartData} onClick={handleSliceClick} options={options}/>
