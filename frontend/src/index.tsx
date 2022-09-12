@@ -1,29 +1,28 @@
-import React, {useEffect, useState} from 'react';
-import { createRoot } from 'react-dom/client';
+import React, {MouseEvent, useEffect, useState, useRef} from 'react'
+import { createRoot } from 'react-dom/client'
 
-// import Accordion from 'react-bootstrap/Accordion';
-// import AccordionItem from "react-bootstrap/AccordionItem";
-//
-// import Tab from 'react-bootstrap/Tab';
-// import Tabs from 'react-bootstrap/Tabs';
-//
+import Breadcrumb from 'react-bootstrap/Breadcrumb'
+import {BreadcrumbItem} from "react-bootstrap"
+import 'bootstrap/dist/css/bootstrap.min.css'
 
-import Breadcrumb from 'react-bootstrap/Breadcrumb';
+import FileTree from 'react-file-treeview'
 
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
+import { Chart, getElementAtEvent } from 'react-chartjs-2'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
 
-import { getDirData, getFileSystems, getName } from "./API";
+import { getDirData, getFileSystems, getName } from './API'
 
-import "./index.css"
-import {BreadcrumbItem} from "react-bootstrap";
+ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
+ChartJS.overrides['pie'].plugins.legend.position = 'bottom'
 
 type LayerDatum = {
-    rootDirId: number;
-    command: string;
+    rootDirId: number
+    command: string
 }
 
-interface FileSystemTreeMapProps {
-    rootDirId: number;
+interface FileSystemProps {
+    rootDirId: number
 }
 
 type DirData = {
@@ -34,90 +33,65 @@ type DirData = {
     Files: DirData[]
 }
 
-const FileSystemTreeMap: React.FC<FileSystemTreeMapProps> = (props: FileSystemTreeMapProps) => {
 
-    // TODO - combine these two sources of state into one
-    const [dirData, setDirData] = useState<DirData>({Id: -1, IsDir: false, Name: ' ', Size: 0, Files: []});
-    const [dirStack, setDirStack] = useState<DirData[]>([dirData]);
+const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) => {
 
-    // this component will render the tree map
-    // every time the user clicks a section in the tree map,
-    // the onClick handler will fetch new dir data and feed
-    // it into setDirData, which will trigger this component
-    // getting re-rendered, drawing the new tree map.
+    const [dirStack, setDirStack] = useState<DirData[]>([])
+    const pieChartRef = useRef<ChartJS>()
 
-    const updateDirDataFromApi = async (dirId: number) => {
-        if (dirId < 0) {
-            return
+    const FILE_COLOR = "rgba(141, 210, 248, 0.8)"
+    const DIRE_COLOR = "rgba(39, 17, 190, 0.28)"
+
+    const copyDirStack = (): DirData[] => {
+        return [...dirStack];
+    }
+
+    const getDirDataAndPushToDirStack = async (dirId: number) => {
+        let dirData: DirData = await getDirData(dirId)
+        let newDirStack = copyDirStack()
+        if (dirData.Name === "/") {
+            dirData.Name = " "
         }
-        const rootDirData: DirData = await getDirData(dirId);
-        setDirData(rootDirData);
+        newDirStack.push(dirData)
+        setDirStack(newDirStack)
     }
 
     const handleBreadcrumbClick = async () => {
-
-        // copy the dir stack, removing the top element of the stack
-        let newDirStack: DirData[] = [];
-        for (const d of dirStack) {
-            newDirStack.push(d);
-        }
-        newDirStack.pop();
-
-        // fetch dir data for the new top of the stack
-        const stackTop: DirData|undefined = newDirStack.at(-1);
-        if (stackTop !== undefined) {
-            await updateDirDataFromApi(stackTop.Id);
-        }
-
-        // re-render the breadcrumb
-        setDirStack(newDirStack);
-    }
-
-    const handleRectClick = async (file: DirData) => {
-        if (!file.IsDir) {
-            console.log('clicked a file - ignoring rect click');
+        let newDirStack = copyDirStack()
+        if (newDirStack.length < 2) {
             return
         }
-        await updateDirDataFromApi(file.Id);
-        let newDirStack: DirData[] = [];
-        for (const d of dirStack) {
-            newDirStack.push(d);
+        newDirStack.pop()
+        setDirStack(newDirStack)
+    }
+
+    const handleSliceClick = async (event: MouseEvent<HTMLCanvasElement>) => {
+        const { current: chart } = pieChartRef
+        if (!chart) {
+            return
         }
-        newDirStack.push(file);
-        setDirStack(newDirStack);
+        const dir = dirStack.at(-1)
+        if (dir === undefined) {
+            return
+        }
+        const elem = getElementAtEvent(chart, event)[0]
+        if (elem === undefined) {
+            return
+        }
+        const clickedDataIndex: number = elem.index
+        const fileClicked: DirData = dir.Files[clickedDataIndex]
+        if (!fileClicked.IsDir) {
+            return
+        }
+        await getDirDataAndPushToDirStack(fileClicked.Id).catch(console.error)
     }
 
     useEffect(() => {
-        updateDirDataFromApi(props.rootDirId).catch(console.error);
-    }, [props.rootDirId]);
-
-    const rects = []
-    const totalSize: number = dirData.Size;
-    const files = dirData.Files;
-    files.sort(function(a, b){
-        return b.Size - a.Size
-    });
-    let consumedPercent: number = 0;
-    for (let file of files) {
-        const pctSize: number = ((file.Size / totalSize) * 100.0);
-        rects.push(
-            <g key={file.Id + "-g"}>
-                <rect key={file.Id}
-                    x={consumedPercent.toString() + "%"}
-                    y="0%"
-                    width={pctSize.toString() + "%"}
-                    height="100%"
-                    fill="grey" onClick={async () => handleRectClick(file)}>
-                </rect>
-                <text key={file.Id + "-text"}
-                      x={(consumedPercent + 1).toString() + "%"}
-                      y="5%"
-                      fontSize="4">{file.Name + " - " + Math.round(file.Size / 1024 / 1024) + "MB"}
-                </text>
-            </g>
-        )
-        consumedPercent = consumedPercent + pctSize + 0.25;
-    }
+        if (props.rootDirId < 0) {
+            return
+        }
+        getDirDataAndPushToDirStack(props.rootDirId).catch(console.error)
+    }, [props.rootDirId])
 
     const breadcrumbItems = []
     for (let dir of dirStack) {
@@ -128,6 +102,56 @@ const FileSystemTreeMap: React.FC<FileSystemTreeMapProps> = (props: FileSystemTr
         )
     }
 
+    const labels: string[] = []
+    const percents: number[] = []
+    const backgroundColors: string[] = []
+    const curDir: DirData|undefined = dirStack.at(-1)
+    if (curDir !== undefined) {
+        for (let file of curDir.Files) {
+            const label = file.Name
+            const size = file.Size
+            labels.push(label)
+            percents.push(size)
+            backgroundColors.push(file.IsDir ? DIRE_COLOR : FILE_COLOR)
+        }
+    }
+    const pieChartData = {
+        labels: labels,
+        datasets: [
+            {
+                label: 'MB disk usage',
+                data: percents,
+                backgroundColor: backgroundColors,
+                borderColor: "dark-blue",
+                borderWidth: 1
+            },
+        ],
+    }
+    const options = {
+        plugins: {
+            datalabels: {
+                formatter: (val: number) => {
+                    if (val < 1) {
+                        return ''
+                    }
+                    if (val > 1024*1024*1024) {
+                        val = Math.round(val / 1024 / 1024 / 1024)
+                        return val + ' GB'
+                    }
+                    if (val > 1024*1024) {
+                        val = Math.round(val / 1024 / 1024)
+                        return val + ' MB'
+                    }
+                    if (val > 1024) {
+                        val = Math.round(val / 1024)
+                        return val + ' KB'
+                    }
+                    return val + ' B'
+                },
+            }
+        }
+    }
+
     return (
         <div>
             <div onClick={async () => handleBreadcrumbClick()}>
@@ -135,27 +159,30 @@ const FileSystemTreeMap: React.FC<FileSystemTreeMapProps> = (props: FileSystemTr
                     {breadcrumbItems}
                 </Breadcrumb>
             </div>
-            <svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet">
-                {rects}
-            </svg>
+            <div>
+
+            </div>
+            <div>
+                <Chart ref={pieChartRef} type='pie' data={pieChartData} onClick={handleSliceClick} options={options}/>
+            </div>
         </div>
     )
 }
 
 const App: React.FC = () => {
 
-    const[imageName, setImageName] = useState<string>('');
-    const[imageRootId, setImageRootId] = useState<number>(-1);
-    const[layerData, setLayerData] = useState<LayerDatum[]>([]);
+    const[imageName, setImageName] = useState<string>('')
+    const[imageRootId, setImageRootId] = useState<number>(-1)
+    const[layerData, setLayerData] = useState<LayerDatum[]>([])
 
     useEffect(() => {
         const fetchName = async () => {
-            const imageName = await getName();
+            const imageName = await getName()
             setImageName(imageName)
         }
         const fetchFileSystems = async () => {
-            const fileSystems = await getFileSystems();
-            const layerData: LayerDatum[] = [];
+            const fileSystems = await getFileSystems()
+            const layerData: LayerDatum[] = []
             for (let fileSystem of fileSystems) {
                 if (fileSystem.Name === "image") {
                     setImageRootId(fileSystem.RootDirectoryId)
@@ -170,15 +197,15 @@ const App: React.FC = () => {
             layerData.sort(function(a, b){
                 return a.rootDirId - b.rootDirId
             });
-            setLayerData(layerData);
+            setLayerData(layerData)
         }
-        fetchName().catch(console.error);
-        fetchFileSystems().catch(console.error);
-    }, []);
+        fetchName().catch(console.error)
+        fetchFileSystems().catch(console.error)
+    }, [])
 
     return <div>
         <h1>{imageName}</h1>
-        <FileSystemTreeMap rootDirId={imageRootId}></FileSystemTreeMap>
+        <FileSystem rootDirId={imageRootId}></FileSystem>
     </div>
 }
 
