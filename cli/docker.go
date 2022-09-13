@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -140,11 +141,16 @@ func loadFileSystemDataFromImage(cli *client.Client, db *sql.DB, imageId string)
 type HistoryEntry struct {
 	Created     string
 	Created_by  string
-	empty_layer bool
+	Empty_layer bool
 }
 
 type Config struct {
 	History []HistoryEntry
+}
+
+type Manifest struct {
+	Config string
+	Layers []string
 }
 
 func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string) {
@@ -155,6 +161,7 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 	defer resp.Close()
 	reader := tar.NewReader(resp)
 	var imageConfig Config
+	var manifest []Manifest
 	for true {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -162,6 +169,7 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 		}
 		if strings.HasSuffix(header.Name, ".tar") {
 			layerId := strings.Split(header.Name, "/")[0]
+			fmt.Println("Loading data from layer " + layerId)
 			loadFileSystemDataFromTarReader(tar.NewReader(reader), db, layerId)
 		} else if header.Name != "manifest.json" && strings.HasSuffix(header.Name, ".json") {
 			_bytes := make([]byte, header.Size)
@@ -171,20 +179,46 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 			}
 			e := json.Unmarshal(_bytes, &imageConfig)
 			if e != nil {
-				return
+				log.Fatal(e.Error())
 			}
 			history := make([]HistoryEntry, 0)
 			for _, h := range imageConfig.History {
-				if !h.empty_layer {
-					history = append(history, h)
+				if h.Empty_layer {
+					continue
 				}
+				history = append(history, h)
 			}
 			imageConfig.History = history
+		} else if header.Name == "manifest.json" {
+			_bytes := make([]byte, header.Size)
+			_, err := reader.Read(_bytes)
+			if err != io.EOF {
+				log.Fatalln(err.Error())
+			}
+			e := json.Unmarshal(_bytes, &manifest)
+			if e != nil {
+				log.Fatalln(e.Error())
+			}
 		}
 	}
-	layers := LoadLayers(db)
-	for i, layer := range layers {
-		history := imageConfig.History[i]
-		SetFileSystemCommand(db, layer.Id, history.Created_by)
+
+	// Filter out the final image layer if it's been saved already.
+	allDbLayers := LoadLayers(db)
+	dbLayers := make([]Layer, 0)
+	for _, layer := range allDbLayers {
+		if layer.Name == "image" {
+			continue
+		}
+		dbLayers = append(dbLayers, layer)
+	}
+
+	for i, manifestLayerFileName := range manifest[0].Layers {
+		manifestLayerName := strings.Split(manifestLayerFileName, "/")[0]
+		for _, dbLayer := range dbLayers {
+			if dbLayer.Name == manifestLayerName {
+				SetFileSystemCommand(db, dbLayer.Id, imageConfig.History[i].Created_by)
+				SetFileSystemOrder(db, dbLayer.Id, int64(i))
+			}
+		}
 	}
 }

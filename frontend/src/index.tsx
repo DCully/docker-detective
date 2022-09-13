@@ -41,9 +41,6 @@ const App: React.FC = () => {
                     layerData.push(layerDatum)
                 }
             }
-            layerData.sort(function(a, b){
-                return b.rootDirId - a.rootDirId
-            });
             setLayerData(layerData)
         }
         fetchName().catch(console.error)

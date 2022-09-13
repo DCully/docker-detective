@@ -17,6 +17,7 @@ type FileSystemEntry struct {
 type Layer struct {
 	Id              int64
 	RootDirectoryId int64
+	Size            int64
 	Name            string
 	Command         string
 }
@@ -46,7 +47,8 @@ func CreateTables(conn *sql.DB) {
 	filesystemsTable := `CREATE TABLE filesystems (
     	"id" integer not null unique primary key autoincrement,
     	"name" text,
-    	"command" text default ''
+    	"command" text default '',
+    	"layerOrder" integer default -1
     );`
 	_runCreate(conn, filesystemsTable)
 	filesTable := `CREATE TABLE files (
@@ -160,6 +162,19 @@ func SetFileSystemCommand(conn *sql.DB, layerId int64, command string) {
 	}
 }
 
+func SetFileSystemOrder(conn *sql.DB, layerId int64, layerOrder int64) {
+	s := `UPDATE filesystems SET layerOrder = ? WHERE id = ?`
+	statement, err := conn.Prepare(s)
+	defer statement.Close()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	_, er := statement.Exec(layerOrder, layerId)
+	if er != nil {
+		log.Fatal(er.Error())
+	}
+}
+
 func LoadDirectory(conn *sql.DB, directoryId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where parentFileId=?;`
 	statement, err := conn.Prepare(s)
@@ -200,10 +215,11 @@ func LoadLayers(conn *sql.DB) []Layer {
 	s := `select 
 		filesystems.id as fileSystemId,
 		files.id as rootDirectoryId,
+		files.totalSize as fileSystemSize,
 		filesystems.name as fileSystemName,
 		filesystems.command as fileSystemCommand
 	from filesystems
-		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.Id asc;`
+		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.layerOrder asc;`
 	st, err := conn.Prepare(s)
 	defer st.Close()
 	if err != nil {
@@ -215,15 +231,16 @@ func LoadLayers(conn *sql.DB) []Layer {
 	}
 	results := make([]Layer, 0)
 	for rows.Next() {
-		var fileSystemId, fileId int64
+		var fileSystemId, fileId, fileSystemSize int64
 		var fileSystemName, fileSystemCommand string
-		err = rows.Scan(&fileSystemId, &fileId, &fileSystemName, &fileSystemCommand)
+		err = rows.Scan(&fileSystemId, &fileId, &fileSystemSize, &fileSystemName, &fileSystemCommand)
 		if err != nil {
 			log.Fatal(err)
 		}
 		results = append(results, Layer{
 			fileSystemId,
 			fileId,
+			fileSystemSize,
 			fileSystemName,
 			fileSystemCommand,
 		})

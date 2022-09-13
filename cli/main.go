@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/docker/docker/client"
 	"os"
 )
@@ -38,6 +39,8 @@ func main() {
 	im := getImageIdFromImageName(cli, imageName)
 	db := GetDB(":memory:")
 	CreateTables(db)
+	fmt.Println("Parsing Docker image...")
 	parseDockerImageIntoDB(im, db, cli)
+	fmt.Println("Serving web app forever.")
 	serveWebApp(imageName, db)
 }
