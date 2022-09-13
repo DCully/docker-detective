@@ -1,10 +1,11 @@
-import React, {MouseEvent, useEffect, useRef, useState} from "react";
-import {Chart as ChartJS} from "chart.js";
-import {getDirData} from "./API";
-import {Chart, getElementAtEvent} from "react-chartjs-2";
-import {BreadcrumbItem, Col, Container, ListGroupItem, Row} from "react-bootstrap";
-import Breadcrumb from "react-bootstrap/Breadcrumb";
-import ListGroup from "react-bootstrap/ListGroup";
+import React, {MouseEvent, useEffect, useRef, useState} from "react"
+import {Chart as ChartJS} from "chart.js"
+import {getDirData} from "./API"
+import {Chart, getElementAtEvent} from "react-chartjs-2"
+import {BreadcrumbItem, Col, Container, ListGroupItem, Row} from "react-bootstrap"
+import Breadcrumb from "react-bootstrap/Breadcrumb"
+import ListGroup from "react-bootstrap/ListGroup"
+import {rawBytesToReadableBytes} from './util'
 
 export interface FileSystemProps {
     rootDirId: number
@@ -86,25 +87,6 @@ export const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) =>
 
     const handleListGroupItemClick = async (clickedDirData: DirData) => {
         await getDirDataAndPushToDirStack(clickedDirData.Id)
-    }
-
-    const rawBytesToReadableBytes = (val: number) => {
-        if (val < 1) {
-            return '0 B'
-        }
-        if (val > 1024*1024*1024) {
-            val = Math.round(val / 1024 / 1024 / 1024)
-            return val + ' GB'
-        }
-        if (val > 1024*1024) {
-            val = Math.round(val / 1024 / 1024)
-            return val + ' MB'
-        }
-        if (val > 1024) {
-            val = Math.round(val / 1024)
-            return val + ' KB'
-        }
-        return val + ' B'
     }
 
     useEffect(() => {

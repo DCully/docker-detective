@@ -1,23 +1,19 @@
 import React, {useEffect, useState} from 'react'
 import { createRoot } from 'react-dom/client'
 
-import {Stack} from "react-bootstrap";
+import {Accordion, Stack, Tab, Tabs} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 
-import { getDirData, getFileSystems, getName } from './API'
+import { getFileSystems, getName } from './API'
 import { FileSystem } from './FileSystemComponent'
+import { LayeredFileSystemsComponent, LayerDatum } from './LayeredFileSystemsComponent'
 import "./index.css"
 
 ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
 ChartJS.overrides['pie'].plugins.legend.display = false
-
-type LayerDatum = {
-    rootDirId: number
-    command: string
-}
 
 const App: React.FC = () => {
 
@@ -39,13 +35,14 @@ const App: React.FC = () => {
                 } else {
                     const layerDatum: LayerDatum = {
                         rootDirId: fileSystem.RootDirectoryId,
-                        command: fileSystem.Command
+                        command: fileSystem.Command,
+                        size: fileSystem.Size
                     }
                     layerData.push(layerDatum)
                 }
             }
             layerData.sort(function(a, b){
-                return a.rootDirId - b.rootDirId
+                return b.rootDirId - a.rootDirId
             });
             setLayerData(layerData)
         }
@@ -53,12 +50,21 @@ const App: React.FC = () => {
         fetchFileSystems().catch(console.error)
     }, [])
 
-    return <Stack gap={3}>
-        <div className="bg-light border">
-            <h1 className="center">{imageName}</h1>
-        </div>
-        <FileSystem rootDirId={imageRootId}></FileSystem>
-    </Stack>
+    return (
+        <Stack>
+            <div className="bg-light border">
+                <h1 className="center">{imageName}</h1>
+            </div>
+            <Tabs>
+                <Tab eventKey="Image" title="Image">
+                    <FileSystem rootDirId={imageRootId}></FileSystem>
+                </Tab>
+                <Tab eventKey="Layers" title="Layers">
+                    <LayeredFileSystemsComponent layerData={layerData}></LayeredFileSystemsComponent>
+                </Tab>
+            </Tabs>
+        </Stack>
+    )
 }
 
 const container = document.getElementById('app')
