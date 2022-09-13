@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react'
 import { createRoot } from 'react-dom/client'
 
-import {Accordion, Stack, Tab, Tabs} from "react-bootstrap"
+import {Badge, Stack, Tab, Tabs} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -11,6 +11,7 @@ import { getFileSystems, getName } from './API'
 import { FileSystem } from './FileSystemComponent'
 import { LayeredFileSystemsComponent, LayerDatum } from './LayeredFileSystemsComponent'
 import "./index.css"
+import {rawBytesToReadableBytes} from "./util";
 
 ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
 ChartJS.overrides['pie'].plugins.legend.display = false
@@ -19,6 +20,7 @@ const App: React.FC = () => {
 
     const[imageName, setImageName] = useState<string>('')
     const[imageRootId, setImageRootId] = useState<number>(-1)
+    const[totalImageSizeBytes, setTotalImageSizeBytes] = useState<number>(0)
     const[layerData, setLayerData] = useState<LayerDatum[]>([])
 
     useEffect(() => {
@@ -29,9 +31,11 @@ const App: React.FC = () => {
         const fetchFileSystems = async () => {
             const fileSystems = await getFileSystems()
             const layerData: LayerDatum[] = []
+            let totalLayerSize: number = 0
             for (let fileSystem of fileSystems) {
                 if (fileSystem.Name === "image") {
                     setImageRootId(fileSystem.RootDirectoryId)
+                    setTotalImageSizeBytes(fileSystem.Size)
                 } else {
                     const layerDatum: LayerDatum = {
                         rootDirId: fileSystem.RootDirectoryId,
@@ -39,6 +43,7 @@ const App: React.FC = () => {
                         size: fileSystem.Size
                     }
                     layerData.push(layerDatum)
+                    totalLayerSize = totalLayerSize + fileSystem.Size
                 }
             }
             setLayerData(layerData)
@@ -47,16 +52,34 @@ const App: React.FC = () => {
         fetchFileSystems().catch(console.error)
     }, [])
 
+    const getLayersTotalSize = () => {
+        let sum: number = 0
+        for (const layer of layerData) {
+            sum = sum + layer.size
+        }
+        return sum
+    }
+
     return (
         <Stack>
             <div className="bg-light border">
                 <h1 className="center">{imageName}</h1>
             </div>
             <Tabs>
-                <Tab eventKey="Image" title="Image">
+                <Tab eventKey="Image" title={
+                    <React.Fragment>
+                        <Badge bg="info">{rawBytesToReadableBytes(totalImageSizeBytes)}</Badge>
+                        <div>Image File System</div>
+                    </React.Fragment>
+                }>
                     <FileSystem rootDirId={imageRootId}></FileSystem>
                 </Tab>
-                <Tab eventKey="Layers" title="Layers">
+                <Tab eventKey="Layers" title={
+                    <React.Fragment>
+                        <Badge bg="info">{rawBytesToReadableBytes(getLayersTotalSize())}</Badge>
+                        <div>Layered File Systems</div>
+                    </React.Fragment>
+                }>
                     <LayeredFileSystemsComponent layerData={layerData}></LayeredFileSystemsComponent>
                 </Tab>
             </Tabs>

@@ -219,7 +219,7 @@ func LoadLayers(conn *sql.DB) []Layer {
 		filesystems.name as fileSystemName,
 		filesystems.command as fileSystemCommand
 	from filesystems
-		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.layerOrder asc;`
+		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.layerOrder desc;`
 	st, err := conn.Prepare(s)
 	defer st.Close()
 	if err != nil {
