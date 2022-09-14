@@ -24,9 +24,9 @@ func getDockerClient() *client.Client {
 }
 
 func getImageIdFromImageName(cli *client.Client, imageName string) string {
-	filters := filters.NewArgs()
-	filters.Add("reference", imageName)
-	opts := types.ImageListOptions{All: false, Filters: filters}
+	filters_ := filters.NewArgs()
+	filters_.Add("reference", imageName)
+	opts := types.ImageListOptions{All: false, Filters: filters_}
 	imageIds, err := cli.ImageList(context.Background(), opts)
 	if err != nil {
 		log.Fatalln(err)
@@ -126,14 +126,21 @@ func loadFileSystemDataFromImage(cli *client.Client, db *sql.DB, imageId string)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer cli.ContainerRemove(
-		context.Background(),
-		c.ID,
-		types.ContainerRemoveOptions{RemoveVolumes: false, RemoveLinks: false, Force: true})
+	defer func(cli *client.Client, ctx context.Context, containerID string, options types.ContainerRemoveOptions) {
+		err2 := cli.ContainerRemove(ctx, containerID, options)
+		if err2 != nil {
+			log.Println("Failed to remote container - ", err2.Error())
+		}
+	}(cli, context.Background(), c.ID, types.ContainerRemoveOptions{RemoveVolumes: false, RemoveLinks: false, Force: true})
 
 	// Get a tar archive stream of the container and convert the FS to JSON
-	resp, err := cli.ContainerExport(context.Background(), c.ID)
-	defer resp.Close()
+	resp, _ := cli.ContainerExport(context.Background(), c.ID)
+	defer func(resp io.ReadCloser) {
+		err3 := resp.Close()
+		if err3 != nil {
+			log.Println("Failed to close Reader - ", err3.Error())
+		}
+	}(resp)
 	reader := tar.NewReader(resp)
 	loadFileSystemDataFromTarReader(reader, db, "image")
 }
@@ -158,7 +165,12 @@ func loadFileSystemDataFromLayers(cli *client.Client, db *sql.DB, imageId string
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer resp.Close()
+	defer func(resp io.ReadCloser) {
+		err := resp.Close()
+		if err != nil {
+			log.Println("Failed to close Reader - ", err.Error())
+		}
+	}(resp)
 	reader := tar.NewReader(resp)
 	var imageConfig Config
 	var manifest []Manifest

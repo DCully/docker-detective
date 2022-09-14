@@ -68,7 +68,12 @@ func CreateTables(conn *sql.DB) {
 func SaveFileSystem(conn *sql.DB, name string) int64 {
 	s := `INSERT INTO filesystems(name) values (?)`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -90,7 +95,12 @@ func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string,
 		log.Fatal(err.Error())
 	}
 	rows, er := statement.Query(fileSystemId, parentFileId, name, totalSize, isDirectory)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if er != nil {
 		log.Fatal(er.Error())
 	}
@@ -104,12 +114,22 @@ func SaveFile(conn *sql.DB, fileSystemId int64, parentFileId int64, name string,
 func _loadFile(conn *sql.DB, fileId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where id=?;`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	rows, e := statement.Query(fileId)
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Println("Failed to close Rows - ", err.Error())
+		}
+	}(rows)
 	if e != nil {
 		log.Fatal(e.Error())
 	}
@@ -139,7 +159,12 @@ func _loadFile(conn *sql.DB, fileId int64) FileSystemEntry {
 func IncrementFileSize(conn *sql.DB, fileId int64, additionalSize int64) {
 	s := `UPDATE files SET totalSize = totalSize + ? WHERE id = ?`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -152,7 +177,12 @@ func IncrementFileSize(conn *sql.DB, fileId int64, additionalSize int64) {
 func SetFileSystemCommand(conn *sql.DB, layerId int64, command string) {
 	s := `UPDATE filesystems SET command = ? WHERE id = ?`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -165,7 +195,12 @@ func SetFileSystemCommand(conn *sql.DB, layerId int64, command string) {
 func SetFileSystemOrder(conn *sql.DB, layerId int64, layerOrder int64) {
 	s := `UPDATE filesystems SET layerOrder = ? WHERE id = ?`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -178,7 +213,12 @@ func SetFileSystemOrder(conn *sql.DB, layerId int64, layerOrder int64) {
 func LoadDirectory(conn *sql.DB, directoryId int64) FileSystemEntry {
 	s := `select id, fileSystemId, parentFileId, fileName, totalSize, isDirectory from files where parentFileId=?;`
 	statement, err := conn.Prepare(s)
-	defer statement.Close()
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -220,14 +260,19 @@ func LoadLayers(conn *sql.DB) []Layer {
 		filesystems.command as fileSystemCommand
 	from filesystems
 		inner join files on files.fileSystemId = filesystems.Id where files.parentFileId=-1 order by filesystems.layerOrder desc;`
-	st, err := conn.Prepare(s)
-	defer st.Close()
+	statement, err := conn.Prepare(s)
+	defer func(statement *sql.Stmt) {
+		err := statement.Close()
+		if err != nil {
+			log.Println("Failed to close statement - ", err.Error())
+		}
+	}(statement)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	rows, error := st.Query()
-	if error != nil {
-		log.Fatal(error.Error())
+	rows, err2 := statement.Query()
+	if err2 != nil {
+		log.Fatal(err2.Error())
 	}
 	results := make([]Layer, 0)
 	for rows.Next() {
