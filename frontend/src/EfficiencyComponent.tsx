@@ -55,7 +55,7 @@ export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: E
 
     return (
         <div className="center">
-            <h1 className="center">This image is <b>{props.score + "%"}</b> size efficient</h1>
+            <h1 className="center">This image's layers are <b>{props.score + "%"}</b> size efficient</h1>
             <div>
                 <Chart type='pie' data={data} options={options}/>
             </div>
