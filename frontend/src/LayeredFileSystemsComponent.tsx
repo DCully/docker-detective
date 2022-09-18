@@ -23,10 +23,10 @@ export const LayeredFileSystemsComponent: React.FC<LayeredFileSystemsProps> = (p
                     <Container fluid>
                         <Row>
                             <Col className="col-1">
-                                <Badge bg="info">{rawBytesToReadableBytes(layer.size)}</Badge>
+                                <Badge bg="secondary">{rawBytesToReadableBytes(layer.size)}</Badge>
                             </Col>
                             <Col>
-                                <text>{layer.command}</text>
+                                {layer.command}
                             </Col>
                         </Row>
                     </Container>
