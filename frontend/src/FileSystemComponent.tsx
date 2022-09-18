@@ -170,9 +170,18 @@ export const FileSystem: React.FC<FileSystemProps> = (props: FileSystemProps) =>
         <div>
             <Container>
                 <div onClick={async () => handleBreadcrumbClick()}>
-                    <Breadcrumb>
-                        {breadcrumbItems}
-                    </Breadcrumb>
+                    <Container>
+                        <Row>
+                            <Col md="auto">
+                                <p>&larr;</p>
+                            </Col>
+                            <Col>
+                                <Breadcrumb>
+                                    {breadcrumbItems}
+                                </Breadcrumb>
+                            </Col>
+                        </Row>
+                    </Container>
                 </div>
             </Container>
             <Container>
