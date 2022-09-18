@@ -61,14 +61,14 @@ export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: E
             </div>
             <div className="efficiency-p-div">
                 <p>
-                    An image's overall <b>size efficiency score</b> derives from the percentage
-                    of bytes in files in the layers of the Docker image which are ultimately
-                    included in the resulting image file system, after Docker combines the
-                    individual layers to create containers from the image.
+                    An image's overall <b>efficiency score</b> derives from the percentage
+                    of bytes in the layers of the Docker image which are ultimately
+                    included in the resulting Docker image, after the image's layers have been
+                    layered on top of each other.
                 <br/><br/>
-                    Generally, a <b>higher score is better</b> - try
-                    to minimize the number of file bytes in lower layers which are overwritten
-                    or deleted in higher layers, to maximize efficiency when transporting our
+                    Generally, a <b>higher score is better</b>. Try
+                    to minimize the number of bytes in lower layers which are overwritten
+                    or deleted in higher layers, to maximize efficiency when transporting your
                     Docker images across networks and storing them on disk.
                 </p>
             </div>
