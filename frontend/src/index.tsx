@@ -61,7 +61,7 @@ const App: React.FC = () => {
         return sum
     }
 
-    const efficiencyScore: number = Math.round(getLayersTotalSize() / totalImageSizeBytes * 100)
+    const efficiencyScore: number = Math.round((totalImageSizeBytes / getLayersTotalSize()) * 100)
     const efficiencyScoreStr: string =  efficiencyScore.toString() + "%"
 
     return (
