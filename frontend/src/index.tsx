@@ -4,18 +4,18 @@ import { createRoot } from 'react-dom/client'
 import {Badge, Card, Stack, Tab, Tabs} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
+import {Chart, ArcElement, Tooltip, Legend, PieController} from 'chart.js'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 import { getFileSystems, getName } from './API'
 import { FileSystem } from './FileSystemComponent'
 import { LayeredFileSystemsComponent, LayerDatum } from './LayeredFileSystemsComponent'
 import "./index.css"
-import {rawBytesToReadableBytes} from "./util";
-import {EfficiencyComponent, getEfficiencyBadgeColor} from "./EfficiencyComponent";
+import {rawBytesToReadableBytes} from "./util"
+import {EfficiencyComponent, getEfficiencyBadgeColor} from "./EfficiencyComponent"
 
-ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
-ChartJS.overrides['pie'].plugins.legend.display = false
+Chart.register(PieController, ArcElement, Tooltip, ChartDataLabels, Legend)
+Chart.overrides['pie'].plugins.legend.display = false
 
 const App: React.FC = () => {
 

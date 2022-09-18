@@ -2,12 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"strconv"
 )
+
+//go:embed build
+var UI embed.FS
 
 func writeHttpResponse(w *http.ResponseWriter, responseCode int, byteStr []byte) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
@@ -19,10 +24,16 @@ func writeHttpResponse(w *http.ResponseWriter, responseCode int, byteStr []byte)
 	}
 }
 
+func getStaticFS() http.FileSystem {
+	fileSystem, err := fs.Sub(UI, "build")
+	if err != nil {
+		log.Fatalln("Error loading static web app FS:", err.Error())
+	}
+	return http.FS(fileSystem)
+}
+
 func serveWebApp(imageName string, db *sql.DB) {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writeHttpResponse(&w, 200, []byte("todo - serve the front end statically here"))
-	})
+	http.Handle("/", http.FileServer(getStaticFS()))
 	http.HandleFunc("/name", func(w http.ResponseWriter, r *http.Request) {
 		o := make(map[string]string)
 		o["imageName"] = imageName
