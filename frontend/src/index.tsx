@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react'
 import { createRoot } from 'react-dom/client'
 
-import {Badge, Stack, Tab, Tabs} from "react-bootstrap"
+import {Badge, Card, Stack, Tab, Tabs} from "react-bootstrap"
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -12,6 +12,7 @@ import { FileSystem } from './FileSystemComponent'
 import { LayeredFileSystemsComponent, LayerDatum } from './LayeredFileSystemsComponent'
 import "./index.css"
 import {rawBytesToReadableBytes} from "./util";
+import {EfficiencyComponent, getEfficiencyBadgeColor} from "./EfficiencyComponent";
 
 ChartJS.register(ArcElement, Tooltip, ChartDataLabels, Legend)
 ChartJS.overrides['pie'].plugins.legend.display = false
@@ -52,7 +53,7 @@ const App: React.FC = () => {
         fetchFileSystems().catch(console.error)
     }, [])
 
-    const getLayersTotalSize = () => {
+    const getLayersTotalSize = (): number => {
         let sum: number = 0
         for (const layer of layerData) {
             sum = sum + layer.size
@@ -60,24 +61,39 @@ const App: React.FC = () => {
         return sum
     }
 
+    const efficiencyScore: number = Math.round(getLayersTotalSize() / totalImageSizeBytes * 100)
+    const efficiencyScoreStr: string =  efficiencyScore.toString() + "%"
+
     return (
         <Stack>
             <div className="bg-light border">
                 <h1 className="center">{imageName}</h1>
             </div>
-            <Tabs>
+            <Tabs defaultActiveKey="Efficiency">
                 <Tab eventKey="Image" title={
                     <React.Fragment>
-                        <Badge bg="info">{rawBytesToReadableBytes(totalImageSizeBytes)}</Badge>
+                        <Badge bg="secondary">{rawBytesToReadableBytes(totalImageSizeBytes)}</Badge>
                         <div>Image File System</div>
                     </React.Fragment>
                 }>
                     <FileSystem rootDirId={imageRootId}></FileSystem>
                 </Tab>
+                <Tab eventKey="Efficiency" title={
+                    <React.Fragment>
+                        <Badge bg={getEfficiencyBadgeColor(efficiencyScore)}>{efficiencyScoreStr}</Badge>
+                        <div>Space Efficiency</div>
+                    </React.Fragment>
+                }>
+                    <Card>
+                        <Card.Body className="center">
+                            <EfficiencyComponent score={efficiencyScore}></EfficiencyComponent>
+                        </Card.Body>
+                    </Card>
+                </Tab>
                 <Tab eventKey="Layers" title={
                     <React.Fragment>
-                        <Badge bg="info">{rawBytesToReadableBytes(getLayersTotalSize())}</Badge>
-                        <div>Layered File Systems</div>
+                        <Badge bg="secondary">{rawBytesToReadableBytes(getLayersTotalSize())}</Badge>
+                        <div>Layer File Systems</div>
                     </React.Fragment>
                 }>
                     <LayeredFileSystemsComponent layerData={layerData}></LayeredFileSystemsComponent>

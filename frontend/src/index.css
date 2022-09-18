@@ -1,3 +1,17 @@
 .center {
     text-align: center;
 }
+
+ul.nav.nav-tabs {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.efficiency-p-div {
+    display: flex;
+    max-width: 800px;
+    margin-right: auto;
+    margin-left: auto;
+}
