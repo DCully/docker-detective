@@ -5,15 +5,6 @@ export interface EfficiencyComponentProps {
     score: number
 }
 
-const getEfficiencyPieSliceColor = (efficiencyScore: number): string => {
-    if (efficiencyScore > 90) {
-        return "green"
-    } else if (efficiencyScore > 80) {
-        return "yellow"
-    }
-    return "red"
-}
-
 export const getEfficiencyBadgeColor = (efficiencyScore: number): string => {
     if (efficiencyScore > 90) {
         return "success"
@@ -26,7 +17,7 @@ export const getEfficiencyBadgeColor = (efficiencyScore: number): string => {
 export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: EfficiencyComponentProps) => {
 
     const data = {
-        labels: ["Useful", "Waste"],
+        labels: ["Useful", "Bloat"],
         datasets: [
             {
                 label: 'Efficiency',
@@ -35,8 +26,8 @@ export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: E
                     100 - props.score
                 ],
                 backgroundColor: [
-                    getEfficiencyPieSliceColor(props.score),
-                    getEfficiencyPieSliceColor(100 - props.score)
+                    "green",
+                    "red"
                 ],
                 borderColor: "black",
                 borderWidth: 1
@@ -55,7 +46,7 @@ export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: E
 
     return (
         <div className="center">
-            <h1 className="center">This image's layers are <b>{props.score + "%"}</b> size efficient</h1>
+            <h1 className="center"><b>{(100 - props.score) + "%"}</b> of this image's bytes are bloat</h1>
             <div>
                 <Chart type='pie' data={data} options={options}/>
             </div>
@@ -66,7 +57,7 @@ export const EfficiencyComponent: React.FC<EfficiencyComponentProps> = (props: E
                     included in the resulting Docker image, after the image's layers have been
                     layered on top of each other.
                 <br/><br/>
-                    Generally, a <b>higher score is better</b>. Try
+                    Generally, <b>lower bloat is better</b>. Try
                     to minimize the number of bytes in lower layers which are overwritten
                     or deleted in higher layers, to maximize efficiency when transporting your
                     Docker images across networks and storing them on disk.
